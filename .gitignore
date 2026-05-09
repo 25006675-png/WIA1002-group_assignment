@@ -1,0 +1,32 @@
+*.class
+
+# Java build output
+build/
+out/
+target/
+bin/
+dist/
+
+# Package archives
+*.jar
+*.war
+*.ear
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE settings
+.idea/
+.vscode/
+*.iml
+nbproject/private/
+
+# Test and coverage output
+coverage/
+.coverage
