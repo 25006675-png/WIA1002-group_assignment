@@ -2,6 +2,7 @@ package gps;
 
 import java.util.List;
 
+
 public class GpsSimulator {
     private final SimulatedBus bus;
 
@@ -13,6 +14,7 @@ public class GpsSimulator {
     }
 
     public void tick(int secondsElapsed) {
+
         bus.advance(secondsElapsed);
     }
 
