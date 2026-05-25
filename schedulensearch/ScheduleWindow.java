@@ -7,14 +7,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ScheduleWindow {
-    // HashMaps optimized for O(1) lookups
     private final HashMap<String, List<String>> routeMap;
     private final HashMap<String, List<String>> stopMap;
 
     public ScheduleWindow() {
         routeMap = new HashMap<>();
         stopMap = new HashMap<>();
-        initializeWithTeammateData();
+        initializeData();
     }
 
     private void addScheduleEntry(String routeName, String busId, String stopName, String time) {
@@ -32,21 +31,21 @@ public class ScheduleWindow {
         routeMap.computeIfAbsent(busIdKey, k -> new ArrayList<>()).add(routeDisplayInfo);
     }
 
-    private void initializeWithTeammateData() {
-        // === Campus Shuttle Blue (Bus ID: T818) ===
+    private void initializeData() {
+        //T818
         addScheduleEntry("Campus Shuttle Blue", "T818", "Main Gate", "08:00 AM");
         addScheduleEntry("Campus Shuttle Blue", "T818", "Faculty of Science", "08:10 AM");
         addScheduleEntry("Campus Shuttle Blue", "T818", "Library", "08:20 AM");
         addScheduleEntry("Campus Shuttle Blue", "T818", "Student Centre", "08:30 AM");
         addScheduleEntry("Campus Shuttle Blue", "T818", "Hostel", "08:40 AM");
 
-        // === Express Route A (Bus ID: X5) ===
+        // X5
         addScheduleEntry("Express Route A", "X5", "Central Station", "09:00 AM");
         addScheduleEntry("Express Route A", "X5", "Market Square", "09:15 AM");
         addScheduleEntry("Express Route A", "X5", "Business District", "09:35 AM");
         addScheduleEntry("Express Route A", "X5", "Airport", "10:00 AM");
 
-        // === Local Route C (Bus ID: C3) ===
+        //C3
         addScheduleEntry("Local Route C", "C3", "Downtown", "07:30 AM");
         addScheduleEntry("Local Route C", "C3", "Shopping Center", "07:45 AM");
         addScheduleEntry("Local Route C", "C3", "Hospital", "08:05 AM");
@@ -59,7 +58,7 @@ public class ScheduleWindow {
         frame.setSize(550, 500);
         frame.setLayout(new BorderLayout(10, 10));
 
-        // --- SEARCH PANEL ---
+        //SEARCH PANEL
         JPanel searchPanel = new JPanel(new GridLayout(3, 1, 5, 5));
         searchPanel.setBorder(BorderFactory.createTitledBorder("Search Timetables"));
 
@@ -76,12 +75,14 @@ public class ScheduleWindow {
         searchPanel.add(searchField);
         searchPanel.add(searchBtnPanel);
 
+        //RESULT PANEL
         JTextArea resultArea = new JTextArea();
         resultArea.setEditable(false);
         resultArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         JScrollPane scrollPane = new JScrollPane(resultArea);
         scrollPane.setBorder(BorderFactory.createTitledBorder("Search Results"));
 
+        //DATA ENTRY PANEL
         JPanel adminPanel = new JPanel(new GridLayout(5, 2, 5, 5));
         adminPanel.setBorder(BorderFactory.createTitledBorder("Add New Custom Entry"));
 
@@ -102,7 +103,7 @@ public class ScheduleWindow {
         adminPanel.add(new JLabel(""));
         adminPanel.add(addBtn);
 
-
+       //HASHMAP OPERATION
         routeBtn.addActionListener(e -> {
             String query = searchField.getText().trim().toLowerCase();
             if (routeMap.containsKey(query)) {
