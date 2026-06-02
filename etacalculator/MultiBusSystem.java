@@ -19,7 +19,6 @@ import java.util.List;
  */
 public class MultiBusSystem {
     private final List<GpsSimulator> simulators;
-    private MinHeap arrivalHeap;
 
     public MultiBusSystem() {
         this.simulators = new ArrayList<>();
