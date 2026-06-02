@@ -2,6 +2,7 @@ package etacalculator;
 
 import gps.GpsSimulator;
 import gps.SampleDataFactory;
+import gps.SimulatedBus;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
@@ -48,12 +49,9 @@ public class BusArrivalBoardDemo {
      */
     private MultiBusSystem createMultiBusSystem() {
         MultiBusSystem system = new MultiBusSystem();
-
-        // Add multiple buses from sample data
-        system.addBus(new GpsSimulator(SampleDataFactory.createCampusShuttle()));
-        system.addBus(new GpsSimulator(SampleDataFactory.createExpress()));
-        system.addBus(new GpsSimulator(SampleDataFactory.createLocalRoute()));
-
+        for (SimulatedBus bus : SampleDataFactory.getAllBuses()) {
+            system.addBus(new GpsSimulator(bus));
+        }
         return system;
     }
 
