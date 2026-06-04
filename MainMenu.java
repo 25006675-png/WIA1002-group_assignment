@@ -1,5 +1,6 @@
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.*;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import etacalculator.BusArrival;
+import etacalculator.MinHeap;
 import gps.BusRoute;
 import gps.BusStatus;
 import gps.BusStop;
@@ -21,6 +23,12 @@ import schedulensearch.ScheduleWindow;
 
 public class MainMenu {
     private static final DecimalFormat DIST_FMT = new DecimalFormat("0.00");
+    private static final Color ACTIVE_BG = new Color(0xE4F6ED);
+    private static final Color ACTIVE_FG = new Color(0x146C43);
+    private static final Color UPCOMING_BG = new Color(0xFFF3D6);
+    private static final Color UPCOMING_FG = new Color(0x8A5A00);
+    private static final Color COMPLETED_BG = new Color(0xECEFF3);
+    private static final Color COMPLETED_FG = new Color(0x59616D);
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(MainMenu::buildAndShow);
@@ -83,10 +91,12 @@ public class MainMenu {
         JTextField searchField = new JTextField(22);
         JButton searchBtn = new JButton("Search Stop");
         JButton clearBtn = new JButton("Clear");
+        JCheckBox showCompleted = new JCheckBox("Show completed trips");
         searchBar.add(new JLabel("Search stop:"));
         searchBar.add(searchField);
         searchBar.add(searchBtn);
         searchBar.add(clearBtn);
+        searchBar.add(showCompleted);
 
         JPanel infoRow = new JPanel(new GridLayout(1, 2, 16, 0));
         JLabel busCountLbl = new JLabel("Demo Time: " + RouteLoader.DEMO_TIME);
@@ -101,13 +111,14 @@ public class MainMenu {
         topSection.add(infoRow, BorderLayout.SOUTH);
         panel.add(topSection, BorderLayout.NORTH);
 
-        String[] cols = {"Status", "Trip ID", "Route", "Current Stop", "Next Stop",
+        String[] cols = {"Status", "Bus", "Route", "Trip Start", "Current Stop", "Next Stop",
                 "Distance (km)", "ETA (min)", "Route ETA (min)"};
         DefaultTableModel model = new DefaultTableModel(cols, 0);
         JTable table = new JTable(model);
         table.setFont(new Font("Monospaced", Font.PLAIN, 12));
         table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
         table.setRowHeight(24);
+        table.setDefaultRenderer(Object.class, new StatusTableRenderer());
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
 
         final String[] searchQuery = {""};
@@ -117,17 +128,21 @@ public class MainMenu {
             List<BusArrival> arrivals = searching
                     ? getDemoArrivalsForStop(states, searchQuery[0])
                     : getDemoArrivals(states);
+            if (!showCompleted.isSelected()) {
+                arrivals.removeIf(a -> arrivalStatus(a).equals("Completed"));
+            }
 
             model.setColumnIdentifiers(searching
-                    ? new String[]{"Status", "Trip ID", "Route", "Current Stop", "Target Stop",
+                    ? new String[]{"Status", "Bus", "Route", "Trip Start", "Current Stop", "Target Stop",
                             "Distance (km)", "ETA (min)", "Route ETA (min)"}
                     : cols);
 
             for (BusArrival a : arrivals) {
                 model.addRow(new Object[]{
                     arrivalStatus(a),
-                    a.getBusId(),
+                    displayBusId(a.getBusId()),
                     a.getRouteName(),
+                    tripStartForId(states, a.getBusId()),
                     a.getCurrentStop(),
                     a.getNextStop(),
                     DIST_FMT.format(a.getDistanceToNextStopKm()),
@@ -173,14 +188,15 @@ public class MainMenu {
             searchQuery[0] = "";
             refresh.run();
         });
+        showCompleted.addActionListener(e -> refresh.run());
         refresh.run();
         return panel;
     }
 
     private static JPanel buildScheduleTab() {
-        ScheduleWindow sw = new ScheduleWindow();
         JPanel panel = new JPanel(new BorderLayout(6, 6));
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        List<ScheduleRow> rows = loadScheduleRows();
 
         JPanel searchPanel = new JPanel(new GridLayout(4, 1, 5, 5));
         searchPanel.setBorder(BorderFactory.createTitledBorder("Search Timetables"));
@@ -191,48 +207,55 @@ public class MainMenu {
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         JButton routeBtn = new JButton("Search Route / Bus");
         JButton stopBtn = new JButton("Search Stop");
+        JCheckBox showCompleted = new JCheckBox("Show completed trips");
         btnRow.add(routeBtn);
         btnRow.add(stopBtn);
+        btnRow.add(showCompleted);
         searchPanel.add(demo);
         searchPanel.add(instruction);
         searchPanel.add(searchField);
         searchPanel.add(btnRow);
 
-        JTextArea resultArea = new JTextArea();
-        resultArea.setEditable(false);
-        resultArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        JScrollPane scroll = new JScrollPane(resultArea);
+        String[] cols = {"Status", "Bus", "Route", "Trip Start", "Stop", "Stop Time"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0);
+        JTable table = new JTable(model);
+        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+        table.setRowHeight(26);
+        table.setDefaultRenderer(Object.class, new StatusTableRenderer());
+        table.getColumnModel().getColumn(0).setPreferredWidth(90);
+        table.getColumnModel().getColumn(1).setPreferredWidth(70);
+        table.getColumnModel().getColumn(2).setPreferredWidth(190);
+        table.getColumnModel().getColumn(3).setPreferredWidth(90);
+        table.getColumnModel().getColumn(4).setPreferredWidth(170);
+        table.getColumnModel().getColumn(5).setPreferredWidth(80);
+        JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createTitledBorder("Search Results"));
+        JLabel resultMeta = new JLabel("Search by route, bus ID, or stop.");
+        resultMeta.setBorder(new EmptyBorder(0, 4, 4, 4));
+        resultMeta.setForeground(new Color(0x59616D));
 
-        JPanel addPanel = new JPanel(new GridLayout(5, 2, 5, 5));
-        addPanel.setBorder(BorderFactory.createTitledBorder("Add New Custom Entry"));
-        JTextField inRoute = new JTextField(), inId = new JTextField();
-        JTextField inStop = new JTextField(), inTime = new JTextField();
-        JButton addBtn = new JButton("Add Entry");
-        addPanel.add(new JLabel("Route Name:")); addPanel.add(inRoute);
-        addPanel.add(new JLabel("Bus ID:")); addPanel.add(inId);
-        addPanel.add(new JLabel("Stop Name:")); addPanel.add(inStop);
-        addPanel.add(new JLabel("Time (e.g. 11:00 AM):")); addPanel.add(inTime);
-        addPanel.add(new JLabel("")); addPanel.add(addBtn);
+        JPanel resultPanel = new JPanel(new BorderLayout(0, 4));
+        resultPanel.add(resultMeta, BorderLayout.NORTH);
+        resultPanel.add(scroll, BorderLayout.CENTER);
 
         panel.add(searchPanel, BorderLayout.NORTH);
-        panel.add(scroll, BorderLayout.CENTER);
-        panel.add(addPanel, BorderLayout.SOUTH);
+        panel.add(resultPanel, BorderLayout.CENTER);
 
-        routeBtn.addActionListener(e -> resultArea.setText(sw.searchRoute(searchField.getText().trim())));
-        stopBtn.addActionListener(e -> resultArea.setText(sw.searchStop(searchField.getText().trim())));
-        addBtn.addActionListener(e -> {
-            String r = inRoute.getText().trim(), b = inId.getText().trim();
-            String s = inStop.getText().trim(), t = inTime.getText().trim();
-            if (r.isEmpty() || b.isEmpty() || s.isEmpty() || t.isEmpty()) {
-                JOptionPane.showMessageDialog(panel, "Please complete all fields.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            sw.addEntry(r, b, s, t);
-            JOptionPane.showMessageDialog(panel, "Entry added! Search by route or stop name to verify.",
-                    "Success", JOptionPane.INFORMATION_MESSAGE);
-            inRoute.setText(""); inId.setText(""); inStop.setText(""); inTime.setText("");
+        final boolean[] stopMode = {false};
+        Runnable refreshSchedule = () -> updateScheduleTable(model, rows, searchField.getText().trim(),
+                stopMode[0], showCompleted.isSelected(), resultMeta);
+        Runnable showAll = () -> updateScheduleTable(model, rows, "", false, showCompleted.isSelected(), resultMeta);
+        routeBtn.addActionListener(e -> {
+            stopMode[0] = false;
+            refreshSchedule.run();
         });
+        stopBtn.addActionListener(e -> {
+            stopMode[0] = true;
+            refreshSchedule.run();
+        });
+        showCompleted.addActionListener(e -> refreshSchedule.run());
+        showAll.run();
         return panel;
     }
 
@@ -271,7 +294,7 @@ public class MainMenu {
 
         Font kf = new Font("SansSerif", Font.BOLD, 13);
         Font vf = new Font("SansSerif", Font.PLAIN, 13);
-        String[] keys = {"Route", "Bus ID", "Trip", "Current Stop", "Next Stop",
+        String[] keys = {"Route", "Bus ID", "Service Time", "Current Stop", "Next Stop",
                 "Distance to Next Stop", "ETA to Next Stop", "ETA to Final Stop", "Status"};
         JLabel[] vals = {routeVal, busVal, tripVal, curStopVal, nxtStopVal,
                 distVal, etaNextVal, etaEndVal, statusVal};
@@ -299,7 +322,7 @@ public class MainMenu {
             BusRoute route = current.simulator.getBus().getRoute();
             routeVal.setText(current.route.routeName);
             busVal.setText(current.route.busId);
-            tripVal.setText(current.trip.tripId + " (" + current.trip.startTime + " - " + current.trip.getEndTime() + ")");
+            tripVal.setText(current.trip.startTime + " - " + current.trip.getEndTime());
 
             if (current.isUpcoming()) {
                 curStopVal.setText("Not started");
@@ -392,14 +415,19 @@ public class MainMenu {
     }
 
     private static List<BusArrival> getDemoArrivals(List<DemoTripState> states) {
+        MinHeap heap = new MinHeap(Math.max(1, states.size()));
+        for (DemoTripState state : states) heap.insert(toArrival(state));
+        return drainArrivalHeap(heap);
+    }
+
+    private static List<BusArrival> drainArrivalHeap(MinHeap heap) {
         List<BusArrival> arrivals = new ArrayList<>();
-        for (DemoTripState state : states) arrivals.add(toArrival(state));
-        arrivals.sort((a, b) -> Integer.compare(a.getEtaToNextStopMin(), b.getEtaToNextStopMin()));
+        while (!heap.isEmpty()) arrivals.add(heap.poll());
         return arrivals;
     }
 
     private static List<BusArrival> getDemoArrivalsForStop(List<DemoTripState> states, String query) {
-        List<BusArrival> arrivals = new ArrayList<>();
+        MinHeap heap = new MinHeap(Math.max(1, states.size()));
         String key = query.toLowerCase();
         for (DemoTripState state : states) {
             int targetIndex = -1;
@@ -416,7 +444,7 @@ public class MainMenu {
                 int eta = targetIndex < state.trip.stopTimes.size()
                         ? Math.max(0, RouteLoader.timeToMinutes(state.trip.stopTimes.get(targetIndex)) - RouteLoader.demoTimeMinutes())
                         : RouteLoader.minutesUntil(state.trip.startTime);
-                arrivals.add(new BusArrival(state.trip.tripId, state.route.routeName, "Not started",
+                heap.insert(new BusArrival(state.trip.tripId, state.route.routeName, "Not started",
                         target.name, 0, state.simulator.getBus().getRoute().getTotalDistanceKm(),
                         eta, eta + tripDurationMinutes(state.trip), false));
                 continue;
@@ -429,12 +457,11 @@ public class MainMenu {
 
             double distanceToTarget = target.distanceFromStartKm - traveled;
             int eta = etaMinutes(distanceToTarget, state.simulator.getBus().getSpeedKmPerHour());
-            arrivals.add(new BusArrival(state.trip.tripId, state.route.routeName, status.getCurrentStop(),
+            heap.insert(new BusArrival(state.trip.tripId, state.route.routeName, status.getCurrentStop(),
                     target.name, distanceToTarget, status.getDistanceToRouteEndKm(),
                     eta, status.getEtaToRouteEndMinutes(), false));
         }
-        arrivals.sort((a, b) -> Integer.compare(a.getEtaToNextStopMin(), b.getEtaToNextStopMin()));
-        return arrivals;
+        return drainArrivalHeap(heap);
     }
 
     private static BusArrival toArrival(DemoTripState state) {
@@ -458,6 +485,137 @@ public class MainMenu {
 
     private static int etaMinutes(double distanceKm, double speedKmPerHour) {
         return Math.max(0, (int) Math.ceil((distanceKm / speedKmPerHour) * 60.0));
+    }
+
+    private static String displayBusId(String tripOrBusId) {
+        int dash = tripOrBusId.indexOf('-');
+        return dash > 0 ? tripOrBusId.substring(0, dash) : tripOrBusId;
+    }
+
+    private static String tripStartForId(List<DemoTripState> states, String tripId) {
+        for (DemoTripState state : states) {
+            if (state.trip.tripId.equals(tripId)) return state.trip.startTime;
+        }
+        return "-";
+    }
+
+    private static List<ScheduleRow> loadScheduleRows() {
+        List<ScheduleRow> rows = new ArrayList<>();
+        try {
+            RouteLoader.LoadResult result = RouteLoader.load();
+            for (RouteLoader.RouteEntry route : result.routeEntries) {
+                for (RouteLoader.TripEntry trip : route.trips) {
+                    String status = RouteLoader.tripStatus(trip);
+                    int count = Math.min(route.stops.size(), trip.stopTimes.size());
+                    for (int i = 0; i < count; i++) {
+                        RouteLoader.StopEntry stop = route.stops.get(i);
+                        rows.add(new ScheduleRow(status, route.busId, route.routeName,
+                                trip.startTime, trip.tripId, stop.name, trip.stopTimes.get(i)));
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            rows.add(new ScheduleRow("Error", "-", "Could not load routes", "-", "-", ex.getMessage(), "-"));
+        }
+        return rows;
+    }
+
+    private static void updateScheduleTable(DefaultTableModel model, List<ScheduleRow> rows,
+                                            String query, boolean stopOnly, boolean showCompleted, JLabel meta) {
+        model.setRowCount(0);
+        String key = query.trim().toLowerCase();
+        int shown = 0;
+        for (ScheduleRow row : rows) {
+            if (!showCompleted && row.status.equals("Completed")) continue;
+            boolean match;
+            if (key.isEmpty()) {
+                match = true;
+            } else if (stopOnly) {
+                match = row.stop.toLowerCase().contains(key);
+            } else {
+                match = row.route.toLowerCase().contains(key)
+                        || row.busId.toLowerCase().contains(key)
+                        || row.tripId.toLowerCase().contains(key);
+            }
+            if (!match) continue;
+            model.addRow(new Object[]{row.status, row.busId, row.route, row.tripStart, row.stop, row.time});
+            shown++;
+        }
+
+        if (shown == 0) {
+            meta.setText("No matching timetable entries.");
+        } else if (key.isEmpty()) {
+            meta.setText("Showing " + (showCompleted ? "all" : "active and upcoming")
+                    + " timetable entries at demo time " + RouteLoader.DEMO_TIME + ".");
+        } else {
+            meta.setText("Showing " + shown + " result(s) for \"" + query + "\".");
+        }
+    }
+
+    private static class ScheduleRow {
+        final String status;
+        final String busId;
+        final String route;
+        final String tripStart;
+        final String tripId;
+        final String stop;
+        final String time;
+
+        ScheduleRow(String status, String busId, String route, String tripStart,
+                    String tripId, String stop, String time) {
+            this.status = status;
+            this.busId = busId;
+            this.route = route;
+            this.tripStart = tripStart;
+            this.tripId = tripId;
+            this.stop = stop;
+            this.time = time;
+        }
+    }
+
+    private static class StatusTableRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
+                                                       boolean hasFocus, int row, int column) {
+            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            setBorder(new EmptyBorder(3, 8, 3, 8));
+
+            String status = table.getValueAt(row, 0).toString();
+            Color bg = statusBackground(status);
+            Color fg = statusForeground(status);
+
+            if (isSelected) {
+                c.setBackground(table.getSelectionBackground());
+                c.setForeground(table.getSelectionForeground());
+            } else {
+                c.setBackground(bg);
+                c.setForeground(column == 0 ? fg : new Color(0x20242A));
+            }
+
+            if (column == 0) {
+                setHorizontalAlignment(SwingConstants.CENTER);
+                setFont(getFont().deriveFont(Font.BOLD));
+                setText(status);
+            } else {
+                setHorizontalAlignment(SwingConstants.LEFT);
+                setFont(getFont().deriveFont(Font.PLAIN));
+            }
+            return c;
+        }
+    }
+
+    private static Color statusBackground(String status) {
+        if (status.equals("Active")) return ACTIVE_BG;
+        if (status.equals("Upcoming")) return UPCOMING_BG;
+        if (status.equals("Completed")) return COMPLETED_BG;
+        return Color.WHITE;
+    }
+
+    private static Color statusForeground(String status) {
+        if (status.equals("Active")) return ACTIVE_FG;
+        if (status.equals("Upcoming")) return UPCOMING_FG;
+        if (status.equals("Completed")) return COMPLETED_FG;
+        return new Color(0x20242A);
     }
 
     private static class DemoTripState {

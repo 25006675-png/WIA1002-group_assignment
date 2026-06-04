@@ -35,11 +35,11 @@ public class ScheduleWindow {
                 }
             }
         } catch (Exception ex) {
-            addEntry("Campus Shuttle Blue", "T818", "Main Gate", "08:00 AM");
-            addEntry("Campus Shuttle Blue", "T818", "Faculty of Science", "08:05 AM");
-            addEntry("Campus Shuttle Blue", "T818", "Library", "08:10 AM");
-            addEntry("Campus Shuttle Blue", "T818", "Student Centre", "08:15 AM");
-            addEntry("Campus Shuttle Blue", "T818", "Hostel Block A", "08:20 AM");
+            addScheduleEntry("Campus Shuttle Blue", "T818", "T818", "Main Gate", "08:00 AM", "Fallback");
+            addScheduleEntry("Campus Shuttle Blue", "T818", "T818", "Faculty of Science", "08:05 AM", "Fallback");
+            addScheduleEntry("Campus Shuttle Blue", "T818", "T818", "Library", "08:10 AM", "Fallback");
+            addScheduleEntry("Campus Shuttle Blue", "T818", "T818", "Student Centre", "08:15 AM", "Fallback");
+            addScheduleEntry("Campus Shuttle Blue", "T818", "T818", "Hostel Block A", "08:20 AM", "Fallback");
         }
     }
 
@@ -61,10 +61,6 @@ public class ScheduleWindow {
                 + String.join("\n", stopMap.get(key));
         }
         return "No stop '" + query + "' found.";
-    }
-
-    public void addEntry(String routeName, String busId, String stopName, String time) {
-        addScheduleEntry(routeName, busId, busId + "-CUSTOM", stopName, time, "Custom");
     }
 
     private void addScheduleEntry(String routeName, String busId, String tripId,
@@ -111,36 +107,11 @@ public class ScheduleWindow {
         JScrollPane scrollPane = new JScrollPane(resultArea);
         scrollPane.setBorder(BorderFactory.createTitledBorder("Search Results"));
 
-        JPanel adminPanel = new JPanel(new GridLayout(5, 2, 5, 5));
-        adminPanel.setBorder(BorderFactory.createTitledBorder("Add New Custom Entry"));
-        JTextField inRoute = new JTextField();
-        JTextField inId = new JTextField();
-        JTextField inStop = new JTextField();
-        JTextField inTime = new JTextField();
-        JButton addBtn = new JButton("Add Entry");
-        adminPanel.add(new JLabel("Route Name:")); adminPanel.add(inRoute);
-        adminPanel.add(new JLabel("Bus ID:")); adminPanel.add(inId);
-        adminPanel.add(new JLabel("Stop Name:")); adminPanel.add(inStop);
-        adminPanel.add(new JLabel("Time:")); adminPanel.add(inTime);
-        adminPanel.add(new JLabel("")); adminPanel.add(addBtn);
-
         routeBtn.addActionListener(e -> resultArea.setText(searchRoute(searchField.getText())));
         stopBtn.addActionListener(e -> resultArea.setText(searchStop(searchField.getText())));
-        addBtn.addActionListener(e -> {
-            String r = inRoute.getText().trim(), b = inId.getText().trim();
-            String s = inStop.getText().trim(), t = inTime.getText().trim();
-            if (r.isEmpty() || b.isEmpty() || s.isEmpty() || t.isEmpty()) {
-                JOptionPane.showMessageDialog(frame, "Please complete all fields.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            addEntry(r, b, s, t);
-            JOptionPane.showMessageDialog(frame, "Entry added!", "Success", JOptionPane.INFORMATION_MESSAGE);
-            inRoute.setText(""); inId.setText(""); inStop.setText(""); inTime.setText("");
-        });
 
         frame.add(searchPanel, BorderLayout.NORTH);
         frame.add(scrollPane, BorderLayout.CENTER);
-        frame.add(adminPanel, BorderLayout.SOUTH);
         frame.setVisible(true);
     }
 
